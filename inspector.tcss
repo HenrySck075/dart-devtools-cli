@@ -1,0 +1,8 @@
+.control {
+  width: 100%;
+  layout: grid
+}
+.j {
+  width: 1fr
+}
+

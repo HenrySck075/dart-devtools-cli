@@ -72,6 +72,20 @@ class CpuSample(_CpuSampleRequired,total=False):
     identityHashCode: int
     classId: int
 
+class _ErrorRequired(Object):
+    kind: ErrorKind
+    message: str
+class Error(_ErrorRequired,total=False):
+    exception: InstanceReference
+    stacktrace: InstanceReference
+
+ErrorKind = Union[
+    Literal["UnhandledException"],
+    Literal["LanguageError"],
+    Literal["InternalError"],
+    Literal["TerminationError"]
+]
+
 class _EventRequired(Response):
     kind: EventKind
     timestamp: int
@@ -139,6 +153,8 @@ EventKind = Union[
 ]
 
 ExtensionData = dict[str, Any]
+
+ExceptionPauseMode = int
 
 class _FieldReferenceRequired(ObjectReference):
     name: str
@@ -262,6 +278,25 @@ class IsolateReference(Response):
     isSystemIsolate: bool 
     isolateGroupId: str 
 
+class _IsolateRequired(IsolateReference):
+    isolateFlags: list[IsolateFlag]
+    startTime: int
+    runnable: bool
+    livePorts: int
+    pauseOnExit: bool
+    pauseEvent: Event
+    libraries: LibraryReference
+    breakpoints: list[Breakpoint]
+    exceptionPauseMode: ExceptionPauseMode
+class Isolate(_IsolateRequired,total=False):
+    rootLib: LibraryReference
+    error: Error
+    extensionRPCs: list[str]
+
+class IsolateFlag(TypedDict):
+    name: str
+    valueAsString: str
+
 class IsolateGroupReference(Response):
     id: str
     number: str
@@ -360,4 +395,6 @@ class VM(VMReference):
     isolateGroups: list[IsolateGroupReference]
     systemIsolates: list[IsolateReference]
     systemIsolateGroups: list[IsolateGroupReference]
+
+
 

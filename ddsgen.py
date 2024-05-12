@@ -1,6 +1,6 @@
 import re, subprocess
 severe = re.compile(r"  ([a-zA-Z@\[\]\|]*) ([a-zA-Z]*)( \[optional\])?;")
-severeSkillIssue = re.compile("  ([a-zA-Z]*),")
+severeSkillIssue = re.compile("  ([a-zA-Z]*)\n")
 
 contents = []
 while True:
@@ -63,6 +63,6 @@ if contentsStr.startswith("class"):
     else: out+=requiredDict
 elif contentsStr.startswith("enum"):
     enums = ""
-    out+=f"{classname} = Union["+"\n"+",\n".join(f'    Literal["{i}"]' for i in severeSkillIssue.findall(contentsStr))+"\n]\n"
+    out+=f"{classname} = Union["+"\n"+",\n".join(f'    Literal["{i.replace(",","")}"]' for i in severeSkillIssue.findall(contentsStr))+"\n]\n"
 
 subprocess.run(["termux-clipboard-set"],input=out.encode())
