@@ -1,10 +1,10 @@
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Type, Union
-from textual.app import App, ComposeResult, RenderResult
+from textual.app import App, ComposeResult, RenderResult, log
 from textual.containers import Container
 from textual.driver import Driver
 from textual.reactive import reactive
-from textual.widget import Widget
+from textual.widget import Widget, WidgetError
 from textual.widgets import Label, TabbedContent, Static
 from websocket import enableTrace 
 import time,sys,asyncio,threading
@@ -34,10 +34,18 @@ class DartDevtoolsCLI(App):
     border: none;
     padding: 0 
 }"""
-    _vm = reactive({},recompose=True)
     def __init__(self, driver_class: Type[Driver] | None = None, css_path: CSSPathType | None = None, watch_css: bool = False):
         super().__init__(driver_class, "j.tcss", watch_css)
         self.styles.layers = ("below", "above") # type: ignore      
+
+    def compose(self):
+        yield MainWid()
+
+class MainWid(Widget):
+    _vm = reactive({},recompose=True)
+
+    def __init__(self, *children: Widget, name: str | None = None, id: str | None = None, classes: str | None = None, disabled: bool = False) -> None:
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
         meow = sys.argv[1].replace("http","ws")+"ws"
         print("Connecting to "+meow)
@@ -46,9 +54,11 @@ class DartDevtoolsCLI(App):
         #self._e = WebSocketApp(meow,on_message=on_ws_message)
         self._isolate = ""
         def j(data: VM):
+            print("what thw actual fuck")
             self._isolate = data["isolates"][0]["id"]
             time.sleep(0.5)
             self._vm = data
+            asyncio.ensure_future(self.recompose())
         threading.Thread(target=ws.run_forever,daemon=True).start()
         time.sleep(1)
         ws.send_json("getVM",on_message=j)
@@ -59,7 +69,7 @@ class DartDevtoolsCLI(App):
 
     def compose(self) -> ComposeResult:
         if self._vm == {}:
-            yield Static("Please wait")
+            yield Static(str(self._vm))
             return
         with TabbedContent("Home","Inspector","Timeline","Memory","Performance","Debugger","Network","Logging"):
             yield Home(self._ws, self._vm) # type: ignore
@@ -70,8 +80,7 @@ class DartDevtoolsCLI(App):
             yield Static("i need it")
             yield Static("s")
             yield Static("word abuse")
-        
-        
+
         
 
 

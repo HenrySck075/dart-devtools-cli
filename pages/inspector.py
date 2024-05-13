@@ -1,5 +1,6 @@
 import asyncio
-from typing import TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Generic, TypeVar
 from textual.app import ComposeResult, LayoutDefinition, events
 from textual.containers import Container, Horizontal, Vertical
 from textual.geometry import SpacingDimensions
@@ -11,6 +12,10 @@ if TYPE_CHECKING:
     from flutter import LayoutNode, Widget as FlutterWidget, ExtensionResult
 else:
     LayoutNode = dict
+    FlutterWidget = dict
+    idk = TypeVar("idk", contravariant=True)
+    class ExtensionResult(Generic[idk], dict):
+        pass
 
 class LayoutExplorer(Widget):
     def __init__(self, ws: WebSocket2, isolateId: str) -> None:
@@ -59,6 +64,7 @@ class Inspector(Widget):
         def h(data: ExtensionResult[FlutterWidget]): 
             self.treeSummary = data 
             asyncio.ensure_future(self.query_one("#treee").recompose())
+        time.sleep(0.5)
         ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": isolateId},h)
         self._layoutExplorer = LayoutExplorer(self._ws,self._isolate)
         self._node = None

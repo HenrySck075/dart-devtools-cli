@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class WebSocket2(WebSocketApp):
     def __init__(self, *args, **kwargs) -> None:
         kwargs.pop("on_message","")
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, on_message=lambda j,v:self.on_genuinely_send_help_please(v))
         self.queued_recv = {}
         self.queued_events = {}
     
@@ -40,7 +40,8 @@ class WebSocket2(WebSocketApp):
         @overload
         def send_json(self, method: Literal["ext.flutter.debugPaint"], params: debugPaint, on_message: Callable[[DebugPaintResponse],None]|None = None):...
     
-    def on_message(self, data: str):
+    def on_genuinely_send_help_please(self, data: str):
+        print(data)
         try:
             j = json.loads(data)
 
@@ -63,6 +64,6 @@ class WebSocket2(WebSocketApp):
             "id": str(rpcid)
         }
         print(h)
-        self.queued_recv[str(rpcid)] = on_message or WebSocket2.j
+        self.queued_recv[str(rpcid)] = on_message if on_message!=None else WebSocket2.j
         self.send(json.dumps(h))
         rpcid+=1
