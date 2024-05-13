@@ -9,6 +9,7 @@ from e import WebSocket2
 class Home(Widget):
     def __init__(self, ws: WebSocket2) -> None:
         super().__init__(name="DevtoolsHome")
+        self.styles.height = "auto"
         self._ws = ws
         
         self.info = ws.send_json("getVM")
