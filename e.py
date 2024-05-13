@@ -1,53 +1,68 @@
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, overload
-from websocket import WebSocket
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, overload
+from websocket import WebSocket, WebSocketApp
 import json
 
+rpcid = 0
 
-def send_json(ws, method: str, params: dict = {}): # type: ignore
-    h: dict[str,Any] = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params,
-        "id": str(ws.id)
-    }
-    print(h)
-    ws.send(json.dumps(h))
-    try:
-        while True:
-            j = json.loads(ws.recv())
-            print(j)
-            if j["id"] != str(ws.id): continue
-            ws.id+=1
-            return j["result"]        
-    except: ws.close()
 
 
 if TYPE_CHECKING:
-    from flutter import ExtensionResponse, Widget, LayoutNode
+    from flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
     from vm import VM, Isolate
     getIsolate = TypedDict("getIsolate", {"isolateId": str})
     streamListen = TypedDict("streamListen", {"streamId": str})
     getRootWidgetSummaryTreeWithPreviews = TypedDict("getRootWidgetSummaryTreeWithPreviews", {"groupName":str, "isolateId": str})
+    timeDilation = TypedDict("timeDilation", {"timeDilation":int, "isolateId": str})
+    debugPaint = TypedDict("debugPaint", {"enabled":bool, "isolateId": str})
     getLayoutExplorerNode = TypedDict("getLayoutExplorerNode", {"groupName":str, "isolateId": str, "id": str, "subtreeDepth": str})
 
-class WebSocket2(WebSocket):
-    def __init__(self, get_mask_key=None, sockopt=None, sslopt=None, fire_cont_frame: bool = False, enable_multithread: bool = True, skip_utf8_validation: bool = False, **_):
-        super().__init__(get_mask_key, sockopt, sslopt, fire_cont_frame, enable_multithread, skip_utf8_validation, **_)
-        self.id = 0
+class WebSocket2(WebSocketApp):
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs.pop("on_message","")
+        super().__init__(*args, **kwargs)
+        self.queued_recv = {}
+        self.queued_events = {}
     
     if TYPE_CHECKING:
         @overload 
-        def send_json(self, method: Literal["getVM"]) -> VM:...
+        def send_json(self, method: Literal["getVM"], params = {}, on_message: Callable[[VM],None]|None = None):...
         @overload 
-        def send_json(self, method: Literal["getIsolate"],params: getIsolate) -> Isolate:...
+        def send_json(self, method: Literal["getIsolate"],params: getIsolate, on_message: Callable[[Isolate],None]|None = None):...
         @overload
-        def send_json(self, method: Literal["streamListen"],params: streamListen) -> Isolate:...
+        def send_json(self, method: Literal["streamListen"],params: streamListen, on_message: Callable[[Isolate],None]|None = None):...
 
         @overload 
-        def send_json(self, method: Literal["ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews"], params: getRootWidgetSummaryTreeWithPreviews) -> ExtensionResponse[Widget]:...
+        def send_json(self, method: Literal["ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews"], params: getRootWidgetSummaryTreeWithPreviews, on_message: Callable[[ExtensionResult[Widget]],None]|None = None):...
         @overload 
-        def send_json(self, method: Literal["ext.flutter.inspector.getLayoutExplorerNode"], params: getLayoutExplorerNode) -> ExtensionResponse[LayoutNode]:...
+        def send_json(self, method: Literal["ext.flutter.inspector.getLayoutExplorerNode"], params: getLayoutExplorerNode, on_message: Callable[[ExtensionResult[LayoutNode]],None]|None = None):...
+        @overload 
+        def send_json(self, method: Literal["ext.flutter.timeDilation"], params: timeDilation, on_message: Callable[[TimeDilationResponse],None]|None = None):...
+        @overload
+        def send_json(self, method: Literal["ext.flutter.debugPaint"], params: debugPaint, on_message: Callable[[DebugPaintResponse],None]|None = None):...
+    
+    def on_message(self, data: str):
+        try:
+            j = json.loads(data)
 
+            if "result" in j.keys(): 
+                self.queued_recv.pop(j["id"])(j["result"])
+            else:
+                for i in self.queued_events.get(j["params"]["streamId"]+"/"+j["params"]["event"]["kind"],[]): i(j["params"]["event"])
 
-    def send_json(self, method: str, params: dict = {}): # type: ignore
-        return send_json(self,method,params)
+        except: self.close()
+    @staticmethod
+    def j(d):
+        pass
+
+    def send_json(self, method: str, params: dict = {}, on_message: Callable[[dict],None]|None = None): # type: ignore
+        global rpcid
+        h: dict[str,Any] = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": str(rpcid)
+        }
+        print(h)
+        self.queued_recv[str(rpcid)] = on_message or WebSocket2.j
+        self.send(json.dumps(h))
+        rpcid+=1

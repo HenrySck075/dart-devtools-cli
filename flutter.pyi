@@ -25,12 +25,17 @@ class Widget(Node):
     children: list[Widget]
     widgetRuntimeType: bool
     stateful: bool
-
-R = TypeVar("R", contravariant=True)
-class ExtensionResponse(Generic[R],TypedDict):
-    result: R
+class ExtensionResponse(TypedDict):
     method: str
     type: Literal["_extensionType"]
+R = TypeVar("R", contravariant=True)
+class ExtensionResult(Generic[R],ExtensionResponse):
+    result: R
+
+class TimeDilationResponse(ExtensionResponse):
+    timeDilation: str
+class DebugPaintResponse(ExtensionResponse):
+    enabled: bool
 
 class _RenderObjectPropertyRequired(Node):
     allowNameWrap: bool

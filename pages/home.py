@@ -1,18 +1,23 @@
+from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.widget import Widget 
 from textual.containers import Container
 from textual.widgets import Label, Static
 
 from e import WebSocket2
+if TYPE_CHECKING:
+    from vm import VM
+else: 
+    VM = dict
 
 
 class Home(Widget):
-    def __init__(self, ws: WebSocket2) -> None:
+    def __init__(self, ws: WebSocket2, info: VM) -> None:
         super().__init__(name="DevtoolsHome")
         self.styles.height = "auto"
         self._ws = ws
         
-        self.info = ws.send_json("getVM")
+        self.info = info 
 
     def compose(self) -> ComposeResult:
         i = self.info

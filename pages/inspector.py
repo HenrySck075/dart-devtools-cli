@@ -8,7 +8,7 @@ from textual.widgets import Button, Checkbox, Static, Tree
 
 from e import WebSocket2
 if TYPE_CHECKING:
-    from flutter import LayoutNode
+    from flutter import LayoutNode, Widget as FlutterWidget, ExtensionResult
 else:
     LayoutNode = dict
 
@@ -55,7 +55,11 @@ class Inspector(Widget):
         self.styles.height = "auto"
         self._ws = ws
         self._isolate = isolateId
-        self.treeSummary = ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": isolateId})
+        self.treeSummary = None 
+        def h(data: ExtensionResult[FlutterWidget]): 
+            self.treeSummary = data 
+            asyncio.ensure_future(self.query_one("#treee").recompose())
+        ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": isolateId},h)
         self._layoutExplorer = LayoutExplorer(self._ws,self._isolate)
         self._node = None
 
@@ -66,32 +70,43 @@ class Inspector(Widget):
                 yield Button("Select widget")
             with Horizontal() as idk:
                 idk.styles.height = 2
-                yield Checkbox("Slow Animations", classes="borderless")
-                yield Checkbox("Guidelines", classes="borderless")
+                yield Checkbox("Slow Animations", classes="borderless", id="slowanim")
+                yield Checkbox("Guidelines", classes="borderless", id="debugpaint")
                 yield Checkbox("Baselines", classes="borderless")
                 yield Checkbox("Highlight Repaints", classes="borderless")
                 yield Checkbox("Highlight Oversized Images", classes="borderless")
-            with Horizontal():
-                root = self.treeSummary["result"]
-                t = Tree("[root]")
-                t.root.set_label("root")
-                t.root.data = root 
-                queue = [(t.root,root["children"])]
-                while queue.__len__()!=0:
-                    new = []
-                    for h in queue:
-                        for i in h[1]:
-                            n = h[0]
-                            if len(i["children"]): 
-                                new.append((n.add(i["description"],i), i.pop("children"))) # type: ignore
-                            else: n.add_leaf(i["description"],i)
-                    queue = new
-                t.styles.width = 30
-                self._node = root
-                t.root.data.pop("children") # type: ignore
-                
-                yield t
+            with Horizontal(id="treee"):
+                if self.treeSummary != None:
+                    root = self.treeSummary["result"]
+                    t = Tree("[root]")
+                    t.root.set_label("root")
+                    t.root.data = root 
+                    queue = [(t.root,root["children"])]
+                    while queue.__len__()!=0:
+                        new = []
+                        for h in queue:
+                            for i in h[1]:
+                                n = h[0]
+                                if len(i["children"]): 
+                                    new.append((n.add(i["description"],i), i.pop("children"))) # type: ignore
+                                else: n.add_leaf(i["description"],i)
+                        queue = new
+                    t.styles.width = 30
+                    self._node = root
+                    t.root.data.pop("children") # type: ignore
+                    
+                    yield t
+                else: 
+                    t = Tree("")
+                    t.styles.width = 30
+                    yield t
                 yield self._layoutExplorer 
+
+    def on_checkbox_changed(self, e: Checkbox.Changed):
+        if e.checkbox.id == "slowanim":
+            self._ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
+        if e.checkbox.id == "debugpaint":
+            self._ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
 
     def on_tree_node_highlighted(self, e: Tree.NodeHighlighted):
         self._node = e.node
