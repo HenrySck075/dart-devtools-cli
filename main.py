@@ -6,14 +6,14 @@ from textual.driver import Driver
 from textual.reactive import reactive
 from textual.widget import Widget, WidgetError
 from textual.widgets import Label, TabbedContent, Static
-from websocket import enableTrace 
+from websockets import connect
 import time,sys,asyncio,threading
 
 if TYPE_CHECKING:
     from vm import Event, VM
 else:
     VM = dict
-from e import WebSocket2
+from e import WebSocket2, WebSocketJsonProtocol
 from pages.home import Home
 from pages.inspector import Inspector
 #enableTrace(True)
@@ -34,38 +34,28 @@ class DartDevtoolsCLI(App):
     border: none;
     padding: 0 
 }"""
+    _vm = reactive({},recompose=True)
     def __init__(self, driver_class: Type[Driver] | None = None, css_path: CSSPathType | None = None, watch_css: bool = False):
         super().__init__(driver_class, "j.tcss", watch_css)
         self.styles.layers = ("below", "above") # type: ignore      
 
-    def compose(self):
-        yield MainWid()
-
-class MainWid(Widget):
-    _vm = reactive({},recompose=True)
-
-    def __init__(self, *children: Widget, name: str | None = None, id: str | None = None, classes: str | None = None, disabled: bool = False) -> None:
-        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
-
         meow = sys.argv[1].replace("http","ws")+"ws"
         print("Connecting to "+meow)
-        ws: WebSocket2 = WebSocket2(meow,on_reconnect=lambda b,v: print("whar"))#type: ignore
-        self._ws = ws 
-        #self._e = WebSocketApp(meow,on_message=on_ws_message)
+        self._ws = None
         self._isolate = ""
-        def j(data: VM):
-            print("what thw actual fuck")
-            self._isolate = data["isolates"][0]["id"]
-            time.sleep(0.5)
-            self._vm = data
-            asyncio.ensure_future(self.recompose())
-        threading.Thread(target=ws.run_forever,daemon=True).start()
-        time.sleep(1)
-        ws.send_json("getVM",on_message=j)
 
-        # Listen to event
-        for i in []:#["Debug", "Service"]:
-            ws.send_json(self._e,"streamListen",{"streamId": i})
+        async def connection():
+            ws = await connect(meow,create_protocol=WebSocketJsonProtocol):
+            self._ws: WebSocketJsonProtocol = ws #type: ignore
+            data:VM = await ws.send_json("getVM")
+            self._isolate = data["isolates"][0]["id"]
+            self._vm = data
+            await self.recompose()
+
+            # Listen to event
+            for i in []:#["Debug", "Service"]:
+                ws.send_json(self._e,"streamListen",{"streamId": i})
+        asyncio.ensure_future(connection())
 
     def compose(self) -> ComposeResult:
         if self._vm == {}:

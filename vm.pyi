@@ -1,10 +1,10 @@
 
 from __future__ import annotations
-"DDS Object Types"
-"actually no please dont use this"
+"Dart VM Core Object Types"
+"the naming is literally java"
 from typing import Any, Literal, TypedDict, Union 
 
-class BoundField():
+class BoundField(TypedDict):
     decl: FieldReference
     name: str | int
     value: InstanceReference | Sentinel
@@ -27,11 +27,35 @@ class Breakpoint(_BreakpointRequired,total=False):
 
 class _ClassReferenceRequired(ObjectReference):
     name: str 
-    library: str
+    library: LibraryReference
 class ClassReference(_ClassReferenceRequired,total=False):
     location: str
     typeParameters: list[str]
-class Class(ClassReference):...
+
+class _ClassRequired(ClassReference):
+    abstract: bool
+    const: bool
+    isSealed: bool
+    isMixinClass: bool
+    isBaseClass: bool
+    isInterfaceClass: bool
+    isFinal: bool
+    traceAllocations: bool
+    interfaces: InstanceReference
+    fields: FieldReference
+    functions: FunctionReference
+    subclasses: ClassReference
+class Class(_ClassRequired,total=False):
+    error: ErrorReference
+    super: ClassReference
+    superType: InstanceReference
+    mixin: InstanceReference
+
+class ClassHeapStats(TypedDict("ClassHeapStatsReserved",{"class": ClassReference}),Response):
+    accumulatedSize: int
+    bytesCurrent: int
+    instancesAccumulated: int
+    instancesCurrent: int
 
 class CodeReference(ObjectReference):
     name: str
@@ -75,6 +99,7 @@ class CpuSample(_CpuSampleRequired,total=False):
 class _ErrorRequired(Object):
     kind: ErrorKind
     message: str
+ErrorReference = _ErrorRequired
 class Error(_ErrorRequired,total=False):
     exception: InstanceReference
     stacktrace: InstanceReference
@@ -195,10 +220,9 @@ class _FunctionReferenceRequired(ObjectReference):
 class FunctionReference(_FunctionReferenceRequired,total=False):
     location: SourceLocation
 
-class _InstanceReferenceRequired(ObjectReference):
+class _InstanceReferenceRequired(TypedDict("_InstanceReferenceRequiredReserved", {"class": ClassReference}),ObjectReference):
     kind: InstanceKind
     identityHashCode: int
-    class_: ClassReference
 class InstanceReference(_InstanceReferenceRequired,total=False):
     valueAsString: str
     valueAsStringIsTruncated: bool
