@@ -1,13 +1,15 @@
 import asyncio
 import time
 from typing import TYPE_CHECKING, Generic, TypeVar
+from textual import reactive
 from textual.app import ComposeResult, LayoutDefinition, events
 from textual.containers import Container, Horizontal, Vertical
 from textual.geometry import SpacingDimensions
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Static, Tree
 
-from e import WebSocket2
+from e import JsonRpc
+
 if TYPE_CHECKING:
     from flutter import LayoutNode, Widget as FlutterWidget, ExtensionResult
 else:
@@ -18,7 +20,7 @@ else:
         pass
 
 class LayoutExplorer(Widget):
-    def __init__(self, ws: WebSocket2, isolateId: str) -> None:
+    def __init__(self, ws: JsonRpc, isolateId: str) -> None:
         super().__init__(name="DevtoolsInspectorLayout")
         self._ws = ws
         self._isolate = isolateId
@@ -55,17 +57,19 @@ class LayoutExplorer(Widget):
 class Inspector(Widget):
     "inspector gadget"
 
-    def __init__(self, ws: WebSocket2, isolateId: str) -> None:
+    treeSummary = reactive.reactive(None)
+    "this does not recompose, even when recompose=True"
+
+    def __init__(self, ws: JsonRpc, isolateId: str) -> None:
         super().__init__(name="DevtoolsInspector")
         self.styles.height = "auto"
         self._ws = ws
         self._isolate = isolateId
-        self.treeSummary = None 
-        def h(data: ExtensionResult[FlutterWidget]): 
-            self.treeSummary = data 
-            asyncio.ensure_future(self.query_one("#treee").recompose())
+        async def h(): 
+            self.treeSummary = await ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": isolateId})
+            await self.recompose()
+        asyncio.ensure_future(h())
         time.sleep(0.5)
-        ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": isolateId},h)
         self._layoutExplorer = LayoutExplorer(self._ws,self._isolate)
         self._node = None
 
@@ -81,10 +85,10 @@ class Inspector(Widget):
                 yield Checkbox("Baselines", classes="borderless")
                 yield Checkbox("Highlight Repaints", classes="borderless")
                 yield Checkbox("Highlight Oversized Images", classes="borderless")
-            with Horizontal(id="treee"):
+            with Horizontal():
                 if self.treeSummary != None:
                     root = self.treeSummary["result"]
-                    t = Tree("[root]")
+                    t = Tree("[root]",id="treee")
                     t.root.set_label("root")
                     t.root.data = root 
                     queue = [(t.root,root["children"])]
@@ -103,16 +107,22 @@ class Inspector(Widget):
                     
                     yield t
                 else: 
-                    t = Tree("")
+                    t = Tree("",id="treee")
                     t.styles.width = 30
                     yield t
                 yield self._layoutExplorer 
+            with Container() as console:
+                console.styles.height = 7 
+
 
     def on_checkbox_changed(self, e: Checkbox.Changed):
         if e.checkbox.id == "slowanim":
-            self._ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
+            coro = self._ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
         if e.checkbox.id == "debugpaint":
-            self._ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
+            coro = self._ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
+        try: 
+            asyncio.ensure_future(coro) # type: ignore # yes i know
+        except NameError: pass
 
     def on_tree_node_highlighted(self, e: Tree.NodeHighlighted):
         self._node = e.node
@@ -120,4 +130,5 @@ class Inspector(Widget):
     #    self._layoutExplorer.displayNodeLayout(e.node.data)
     def on_key(self, e: events.Key):
         if e.key == "h":
+            # TODO: where do they even get the groupName
             self._layoutExplorer.displayNodeLayout(self._node.data)

@@ -4,16 +4,14 @@ from textual.app import App, ComposeResult, RenderResult, log
 from textual.containers import Container
 from textual.driver import Driver
 from textual.reactive import reactive
-from textual.widget import Widget, WidgetError
 from textual.widgets import Label, TabbedContent, Static
-from websockets import connect
-import time,sys,asyncio,threading
+import time,sys,asyncio,aiohttp
 
 if TYPE_CHECKING:
     from vm import Event, VM
 else:
     VM = dict
-from e import WebSocket2, WebSocketJsonProtocol
+from e import JsonRpc
 from pages.home import Home
 from pages.inspector import Inspector
 #enableTrace(True)
@@ -34,28 +32,16 @@ class DartDevtoolsCLI(App):
     border: none;
     padding: 0 
 }"""
-    _vm = reactive({},recompose=True)
+    _vm = reactive({})
     def __init__(self, driver_class: Type[Driver] | None = None, css_path: CSSPathType | None = None, watch_css: bool = False):
         super().__init__(driver_class, "j.tcss", watch_css)
         self.styles.layers = ("below", "above") # type: ignore      
 
-        meow = sys.argv[1].replace("http","ws")+"ws"
-        print("Connecting to "+meow)
+        self.meow = sys.argv[1].replace("http","ws")+"ws"
+        print("Connecting to "+self.meow)
         self._ws = None
         self._isolate = ""
 
-        async def connection():
-            ws = await connect(meow,create_protocol=WebSocketJsonProtocol):
-            self._ws: WebSocketJsonProtocol = ws #type: ignore
-            data:VM = await ws.send_json("getVM")
-            self._isolate = data["isolates"][0]["id"]
-            self._vm = data
-            await self.recompose()
-
-            # Listen to event
-            for i in []:#["Debug", "Service"]:
-                ws.send_json(self._e,"streamListen",{"streamId": i})
-        asyncio.ensure_future(connection())
 
     def compose(self) -> ComposeResult:
         if self._vm == {}:
@@ -72,7 +58,20 @@ class DartDevtoolsCLI(App):
             yield Static("word abuse")
 
         
+    async def on_ready(self, e):
+
+        log("ujejejebegebyeybwbywbgwg w")
+        ws = await JsonRpc().create(self.meow)
+        self._ws: JsonRpc = ws #type: ignore
+        data:VM = await ws.send_json("getVM")
+        self._isolate = data["isolates"][0]["id"]
+        self._vm = data
+        await self.recompose()
+
+        # Listen to event
+        for i in []:#["Debug", "Service"]:
+            await ws.send_json("streamListen",{"streamId": i})
 
 
 if __name__ == "__main__":
-    DartDevtoolsCLI().run()
+    asyncio.run(DartDevtoolsCLI().run_async())

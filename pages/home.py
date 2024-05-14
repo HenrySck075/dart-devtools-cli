@@ -4,7 +4,8 @@ from textual.widget import Widget
 from textual.containers import Container
 from textual.widgets import Label, Static
 
-from e import WebSocket2
+from e import JsonRpc
+
 if TYPE_CHECKING:
     from vm import VM
 else: 
@@ -12,7 +13,7 @@ else:
 
 
 class Home(Widget):
-    def __init__(self, ws: WebSocket2, info: VM) -> None:
+    def __init__(self, ws: JsonRpc, info: VM) -> None:
         super().__init__(name="DevtoolsHome")
         self.styles.height = "auto"
         self._ws = ws
