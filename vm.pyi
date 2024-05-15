@@ -375,6 +375,9 @@ class Script(_ScriptRequired,total=False):
     source: str
     tokenPosTable: list[list[int]]
 
+class ScriptList(Response):
+    scripts: list[ScriptReference]
+
 class Sentinel(Response):
     kind: SentinelKind
     valueAsString: str

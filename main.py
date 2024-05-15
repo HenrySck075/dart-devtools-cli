@@ -4,14 +4,14 @@ from textual.app import App, ComposeResult, RenderResult, log
 from textual.containers import Container
 from textual.driver import Driver
 from textual.reactive import reactive
-from textual.widgets import Label, TabbedContent, Static
+from textual.widgets import Button, Label, TabbedContent, Static
 import time,sys,asyncio,aiohttp
 
 if TYPE_CHECKING:
     from vm import Event, VM
 else:
     VM = dict
-from e import JsonRpc
+from e import Devtools, JsonRpc
 from pages.home import Home
 from pages.inspector import Inspector
 #enableTrace(True)
@@ -45,11 +45,13 @@ class DartDevtoolsCLI(App):
 
     def compose(self) -> ComposeResult:
         if self._vm == {}:
-            yield Static(str(self._vm))
+            yield Static("")
+            self.notify("Connecting to Dart VM")
             return
+        yield Button("Reload",id="r")
         with TabbedContent("Home","Inspector","Timeline","Memory","Performance","Debugger","Network","Logging"):
             yield Home(self._ws, self._vm) # type: ignore
-            yield Inspector(self._ws,self._isolate)
+            yield Inspector(self._ws)
             yield Static("jjejdn")
             yield Static("maymory")
             yield Static("speed")
@@ -61,9 +63,11 @@ class DartDevtoolsCLI(App):
     async def on_ready(self, e):
 
         log("ujejejebegebyeybwbywbgwg w")
-        ws = await JsonRpc().create(self.meow)
-        self._ws: JsonRpc = ws #type: ignore
-        data:VM = await ws.send_json("getVM")
+        ws = Devtools(await JsonRpc().create(self.meow))
+        await ws.create()
+        self.notify("Connected :)")
+        self._ws: Devtools = ws #type: ignore
+        data:VM = await ws.getVM()
         self._isolate = data["isolates"][0]["id"]
         self._vm = data
         await self.recompose()

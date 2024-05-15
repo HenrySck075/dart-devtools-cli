@@ -1,0 +1,2 @@
+./vanilla.sh
+git push
