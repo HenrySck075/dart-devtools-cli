@@ -9,11 +9,12 @@ from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Static, Tree
 
 from e import Devtools, JsonRpc
-from vm import Event
 
 if TYPE_CHECKING:
     from flutter import LayoutNode, Widget as FlutterWidget, ExtensionResult
+    from vm import Event
 else:
+    Event = dict
     LayoutNode = dict
     FlutterWidget = dict
     idk = TypeVar("idk", contravariant=True)
@@ -71,11 +72,11 @@ class Inspector(Widget):
             await self.recompose()
         asyncio.ensure_future(h())
         time.sleep(0.5)
-        self._layoutExplorer = LayoutExplorer(self._ws,self._isolate)
+        self._layoutExplorer = LayoutExplorer(self._ws.ws,self._isolate)
         self._node = None
 
     def compose(self) -> ComposeResult:
-        with Vertical():
+        with Vertical() as tf:
             with Horizontal() as j:
                 j.styles.height = 3
                 yield Button("Select widget")
@@ -117,14 +118,14 @@ class Inspector(Widget):
                 out = Static()
                 async def on_log(e: Event):
                     out.update(out.renderable+"\n"+e["logRecord"]["message"].get("valueAsString","")) # type: ignore
-                self._ws.addEventListener('Logging/Logging',on_log)
+                self._ws.ws.addEventListener('Logging/Logging',on_log)
                 yield out
 
     def on_checkbox_changed(self, e: Checkbox.Changed):
         if e.checkbox.id == "slowanim":
-            coro = self._ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
+            coro = self._ws.ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
         if e.checkbox.id == "debugpaint":
-            coro = self._ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
+            coro = self._ws.ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
         try: 
             asyncio.ensure_future(coro) # type: ignore # yes i know
         except NameError: pass

@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     getLayoutExplorerNode = TypedDict("getLayoutExplorerNode", {"groupName":str, "isolateId": str, "id": str, "subtreeDepth": str})
 else:
     Event = dict
+    VM = dict
+    Isolate = dict
+    Response = dict
 
 class JsonRpc:
     def __init__(self) -> None:
@@ -129,18 +132,19 @@ class Devtools:
 
     if TYPE_CHECKING:
         @overload 
-        async def getObject(self, obj: ScriptReference, isolateId: str) -> Script:...
+        async def getObject(self, obj: ScriptReference) -> Script:...
         @overload 
-        async def getObject(self, obj: IsolateReference, isolateId: str) -> Isolate:...
-    async def getObject(self, obj: Response | str, isolateId: str):
+        async def getObject(self, obj: IsolateReference) -> Isolate:...
+    async def getObject(self, obj: Response | str):
         if type(obj) == str: 
             objId = obj 
-        else: 
-            assert obj is str, "this will never hit, but pyright is stupid so"
+        elif type(obj) == Response: 
             if not obj["type"].startswith("@"): 
                 warn("Unnecessary request prevented: Object passes is not a reference.")
                 return obj
             objId = obj["id"] # type: ignore
-        return await self.ws.send_json("getObject", {"isolateId": isolateId, "objectId": objId})
+        else:
+            objId = "no"
+        return await self.ws.send_json("getObject", {"isolateId": self.isolate["id"], "objectId": objId})
 
 

@@ -1,7 +1,7 @@
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Type, Union
 from textual.app import App, ComposeResult, RenderResult, log
-from textual.containers import Container
+from textual.containers import Container, VerticalScroll
 from textual.driver import Driver
 from textual.reactive import reactive
 from textual.widgets import Button, Label, TabbedContent, Static
@@ -14,6 +14,7 @@ else:
 from e import Devtools, JsonRpc
 from pages.home import Home
 from pages.inspector import Inspector
+from pages.debugger import Debugger
 #enableTrace(True)
 
 CSSPathType = Union[
@@ -49,15 +50,16 @@ class DartDevtoolsCLI(App):
             self.notify("Connecting to Dart VM")
             return
         yield Button("Reload",id="r")
-        with TabbedContent("Home","Inspector","Timeline","Memory","Performance","Debugger","Network","Logging"):
-            yield Home(self._ws, self._vm) # type: ignore
-            yield Inspector(self._ws)
-            yield Static("jjejdn")
-            yield Static("maymory")
-            yield Static("speed")
-            yield Static("i need it")
-            yield Static("s")
-            yield Static("word abuse")
+        with VerticalScroll():
+            with TabbedContent("Home","Inspector","Timeline","Memory","Performance","Debugger","Network","Logging"):
+                yield Home(self._ws, self._vm) # type: ignore
+                yield Inspector(self._ws)
+                yield Static("jjejdn")
+                yield Static("maymory")
+                yield Static("speed")
+                yield Debugger(self._ws)
+                yield Static("s")
+                yield Static("word abuse")
 
         
     async def on_ready(self, e):
