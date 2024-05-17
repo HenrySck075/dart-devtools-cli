@@ -3,17 +3,18 @@ from rich.segment import Segment
 from rich.style import Style
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
+from textual.widgets.option_list import Option
 from textual.message import Message
 from textual.strip import Strip
 from textual.widget import Widget
-from textual.widgets import Input, OptionList, Static, TextArea
+from textual.widgets import Input, OptionList, TextArea
 from textual import log
 
 from e import JsonRpc
 if TYPE_CHECKING:
-    from vm import ScriptReference, Event
+    from vm import ScriptReference, Event, Breakpoint
 else:
-    Event = dict
+    from not_typing import *
 
 class MarkableTextArea(TextArea):
     def __init__(self, text: str = "", *, language: str | None = None, theme: str = "css", soft_wrap: bool = True, tab_behavior: Literal["focus", "indent"] = "focus", read_only: bool = False, show_line_numbers: bool = False, max_checkpoints: int = 50, name: str | None = None, id: str | None = None, classes: str | None = None, disabled: bool = False, valid_locations: list[int] = []) -> None:
@@ -28,9 +29,13 @@ class MarkableTextArea(TextArea):
     
     def action_mark(self):
         y = self.cursor_location[0]
-        self.markers.append(y)
+        if y not in self.markers:
+            self.markers.append(y)
+            self.post_message(self.Marked(y+1))
+        else: 
+            self.markers.remove(y)
+            self.post_message(self.Unmarked(y+1))
         self.refresh_line(y-self.scroll_y.__round__())
-        self.post_message(self.Marked(y))
 
     def render_line(self, y: int):
         s = "  "
@@ -49,6 +54,10 @@ class MarkableTextArea(TextArea):
         # TODO: impl
         return out
 
+    class Unmarked(Message):
+        def __init__(self, line: int) -> None:
+            self.line = line
+            super().__init__()
     class Marked(Message):
         def __init__(self, line: int) -> None:
             self.line = line
@@ -62,7 +71,8 @@ class Source(Widget):
         self.source = ""
         self.uri = ""
         self.sid = ""
-        self.breakpointLocations = []
+        self.bps = {}
+        self.breakpointableLocations = []
 
     async def on_show(self, e):
         if self.scripts.__len__() == 0:
@@ -75,17 +85,23 @@ class Source(Widget):
         self.sid = script["id"]
         self.source = script.get("source","")
         self.uri = uri
-        self.breakpointLocations = [i[0]-1 for i in script.get("tokenPosTable",[])]
+        self.breakpointableLocations = [i[0]-1 for i in script.get("tokenPosTable",[])]
+        self.bps = {}
         await self.recompose()
     
     def compose(self) -> ComposeResult:
         if self.uri == "":
             return
         yield Input(self.uri)
-        yield MarkableTextArea(self.source,read_only=True,soft_wrap=False,valid_locations=self.breakpointLocations)
+        d = MarkableTextArea(self.source,read_only=True,soft_wrap=False,valid_locations=self.breakpointableLocations,show_line_numbers=True)
+        d.markers = [i["location"].get("line",0) for i in self._ws.isolate.get("breakpoints",[])]
+        yield d
 
+    async def on_markable_text_area_unmarked(self, e: MarkableTextArea.Unmarked):
+        await self._ws.send_json("removeBreakpoint", {"breakpointId": self.bps[e.line], "isolateId": self._ws.isolate["id"]})
     async def on_markable_text_area_marked(self, e: MarkableTextArea.Marked):
-        await self._ws.send_json("addBreakpoint", {"line": e.line, "scriptId": self.sid, "isolateId": self._ws.isolate["id"]})
+        self.bps[e.line] = (await self._ws.send_json("addBreakpoint", {"line": e.line, "scriptId": self.sid, "isolateId": self._ws.isolate["id"]}))["id"]
+
 
 class Debugger(Widget):
     def __init__(self, ws:JsonRpc):
@@ -104,25 +120,32 @@ class Debugger(Widget):
         if not self._debugListened:
             async def _on_breakpoint_added(d: Event):
                 self.breakpoints.append(d["breakpoint"]) # type: ignore
-                await self.query_one("#uwu").recompose()
+                self.query_one("#bp",OptionList).add_option(self.construct_bp_option(d["breakpoint"]))
 
             async def _on_breakpoint_removed(d: Event):
                 self.breakpoints.remove(d["breakpoint"]) # type: ignore
-                await self.query_one("#uwu").recompose()
+                self.query_one("#bp",OptionList).remove_option(d["breakpoint"]["breakpointNumber"].__str__())
 
             self._ws.addEventListener("Debug/BreakpointAdded",_on_breakpoint_added)
             self._ws.addEventListener("Debug/BreakpointRemoved",_on_breakpoint_removed)
                 
         self._debugListened = True
+
+    def construct_bp_option(self, i:Breakpoint):
+        return Option(":".join([i["location"]["script"]["uri"].split("/")[-1],i["location"]["line"].__str__()]),id=i["breakpointNumber"].__str__()) # type: ignore
+    def on_option_list_option_selected(self, e:OptionList.OptionSelected):
+        self.query_one(MarkableTextArea).cursor_location = (int(e.option.prompt.split(":")[1])-1,0)
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(id="uwu") as v:
+                v.styles.height = "auto"
+                
                 v.styles.width = 25
-                j = [":".join([i["location"]["script"]["uri"].split("/")[-1],i["location"]["line"].__str__(),i["location"]["column"].__str__()]) for i in self.breakpoints]
+                j = [self.construct_bp_option(i) for i in self.breakpoints]
                 with Container(classes="box") as callStack:
                     callStack.border_title = "Call Stack"
                 with Container(classes="box") as variables:
                     variables.border_title = "Variables"
-                with OptionList(*j,classes="box") as breakpoints:
+                with OptionList(*j,classes="box",id="bp") as breakpoints:
                     breakpoints.border_title = "Breakpoints"
             yield Source(self._ws)

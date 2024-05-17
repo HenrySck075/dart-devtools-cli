@@ -16,7 +16,7 @@ class BoundVariable(Response):
     scopeStartTokenPos: int
     scopeEndTokenPos: int
 
-class _BreakpointRequired(TypedDict):
+class _BreakpointRequired(Object):
     location: SourceLocation
     breakpointNumber: int 
     enabled: bool 
@@ -363,6 +363,7 @@ class Parameter(_ParameterRequired,total=False):
 
 class Response(TypedDict):
     type: str
+
 
 class ScriptReference(ObjectReference):
     uri: str

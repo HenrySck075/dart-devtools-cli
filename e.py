@@ -3,12 +3,13 @@ from threading import Thread
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypedDict, Union, overload
 from warnings import warn
 from aiohttp import ClientSession
-from textual import log 
+from textual import log
+
 L = Literal
 if TYPE_CHECKING:
     from s0 import FrameworkVersion
     from flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
-    from vm import VM, Isolate, Event, ScriptList, ObjectReference, Script, ScriptReference, IsolateReference, Response 
+    from vm import VM, Isolate, Event, ScriptList, Breakpoint, Script, ScriptReference, IsolateReference, Response 
     RequiresIsolateId = TypedDict("RequiresIsolateId", {"isolateId": str})
     getIsolate = RequiresIsolateId
     streamListen = TypedDict("streamListen", {"streamId": str})
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
     class addBreakpoint(RequiresIsolateId):
         line: int
         scriptId: str
+    class removeBreakpoint(RequiresIsolateId):
+        breakpointId: str
     debugPaint = TypedDict("debugPaint", {"enabled":bool, "isolateId": str})
     getLayoutExplorerNode = TypedDict("getLayoutExplorerNode", {"groupName":str, "isolateId": str, "id": str, "subtreeDepth": str})
 else:
@@ -31,7 +34,8 @@ else:
     VM = dict
     Isolate = dict
     Response = dict
-
+class IsolateExited(Exception):
+    pass
 class JsonRpc:
     def __init__(self) -> None:
         self.queued_recv = {}
@@ -48,10 +52,14 @@ class JsonRpc:
         "real"
         self._ws = await self.session.ws_connect(*args,**kwargs)
         async def h():
+            queued = {}
+            "somehow these are still not catched"
             async for msg in self._ws:
                 j = msg.json()
                 if "result" in j.keys():
-                    await self.queued_recv.pop(j["id"], lambda n: None)(j["result"])
+                    #if j["result"]["type"] == "Sentinel":
+                    #    raise IsolateExited()
+                    await self.queued_recv.pop(j["id"], lambda n: log("No response catcher found for id "+j["id"]))(j["result"])
                 elif j.get("method","") == "streamNotify":
                     n = j["params"]["streamId"]+"/"+j["params"]["event"]["kind"]
                     log("Calling event "+n)
@@ -66,12 +74,12 @@ class JsonRpc:
     
     def addEventListener(
         self, 
-        event:Union[
-            L["VM/VMUpdate"],
+        event:Literal[
+            "VM/VMUpdate",
 
-            L["Debug/PauseStart"], L["Debug/PauseExit"], L["Debug/PauseBreakpoint"], L["Debug/PauseInterrupted"], L["Debug/PauseException"], L["Debug/PausePostRequest"], L["Debug/Resume"], L["Debug/BreakpointAdded"], L["Debug/BreakpointResolved"], L["Debug/BreakpointRemoved"], L["Debug/BreakpointUpdated"], L["Debug/Inspect"], L["Debug/None"],
+            "Debug/PauseStart", "Debug/PauseExit", "Debug/PauseBreakpoint", "Debug/PauseInterrupted", "Debug/PauseException", "Debug/PausePostRequest", "Debug/Resume", "Debug/BreakpointAdded", "Debug/BreakpointResolved", "Debug/BreakpointRemoved", "Debug/BreakpointUpdated", "Debug/Inspect", "Debug/None",
 
-            L["Logging/Logging"]
+            "Logging/Logging"
         ], 
         listener: Callable[[Event],Coroutine[Any,Any,None]]
     ):
@@ -83,29 +91,35 @@ class JsonRpc:
 
     if TYPE_CHECKING:
         @overload 
-        def send_json(self, method: Literal["addBreakpoint"], params: addBreakpoint):...
+        async def send_json(self, method: Literal["addBreakpoint"], params: addBreakpoint) -> Breakpoint:...
+        @overload 
+        async def send_json(self, method: Literal["removeBreakpoint"], params: removeBreakpoint):...
         @overload 
         def send_json(self, method: Literal["getObject"], params: getObject):...
         @overload 
-        def send_json(self, method: Literal["getVM"], params = {}) -> Coroutine[Any,Any,VM]:...
+        async def send_json(self, method: Literal["getVM"], params = {}) -> VM:...
         @overload 
-        def send_json(self, method: Literal["getScripts"], params = {}) -> Coroutine[Any,Any,ScriptList]:...
+        async def send_json(self, method: Literal["getScripts"], params = {}) -> ScriptList:...
         @overload 
-        def send_json(self, method: Literal["getIsolate"],params: getIsolate) -> Coroutine[Any,Any,Isolate]:...
+        async def send_json(self, method: Literal["getIsolate"],params: getIsolate) -> Isolate:...
         @overload
-        def send_json(self, method: Literal["streamListen"],params: streamListen) -> Coroutine[Any,Any,Isolate]:...
+        async def send_json(self, method: Literal["streamListen"],params: streamListen) -> Isolate:...
 
         @overload 
-        def send_json(self, method: Literal["ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews"], params: getRootWidgetSummaryTreeWithPreviews) -> Coroutine[Any,Any,ExtensionResult[Widget]]:...
+        async def send_json(self, method: Literal["ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews"], params: getRootWidgetSummaryTreeWithPreviews) -> ExtensionResult[Widget]:...
         @overload 
-        def send_json(self, method: Literal["ext.flutter.inspector.getLayoutExplorerNode"], params: getLayoutExplorerNode) -> Coroutine[Any,Any,ExtensionResult[LayoutNode]]:...
+        async def send_json(self, method: Literal["ext.flutter.inspector.getLayoutExplorerNode"], params: getLayoutExplorerNode) -> ExtensionResult[LayoutNode]:...
         @overload 
-        def send_json(self, method: Literal["ext.flutter.timeDilation"], params: timeDilation) -> Coroutine[Any,Any,TimeDilationResponse]:...
+        async def send_json(self, method: Literal["ext.flutter.timeDilation"], params: timeDilation) -> TimeDilationResponse:...
         @overload
-        def send_json(self, method: Literal["ext.flutter.debugPaint"], params: debugPaint) -> Coroutine[Any,Any,DebugPaintResponse]:...
+        async def send_json(self, method: Literal["ext.flutter.debugPaint"], params: debugPaint) -> DebugPaintResponse:...
 
         @overload
-        def send_json(self, method: Literal["s0.flutterVersion"], params: RequiresIsolateId) -> Coroutine[Any,Any,FrameworkVersion]:...
+        async def send_json(self, method: Literal["s0.flutterVersion"], params: RequiresIsolateId) -> FrameworkVersion:...
+        @overload
+        async def send_json(self, method: Literal["s0.reloadSources"], params: RequiresIsolateId) -> FrameworkVersion:...
+        @overload
+        async def send_json(self, method: Literal["s0.hotRestart"], params: RequiresIsolateId) -> FrameworkVersion:...
  
     async def send_json(self, method: str, params: dict = {}) -> dict: # type: ignore
         global rpcid

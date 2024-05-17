@@ -1,11 +1,11 @@
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, List, Type, Union
-from textual.app import App, ComposeResult, RenderResult, log
-from textual.containers import Container, VerticalScroll
+from textual.app import App, ComposeResult, log
+from textual.containers import Horizontal, VerticalScroll
 from textual.driver import Driver
 from textual.reactive import reactive
-from textual.widgets import Button, Label, TabbedContent, Static
-import time,sys,asyncio,aiohttp
+from textual.widgets import Button, TabbedContent, Static
+import sys,asyncio
 
 if TYPE_CHECKING:
     from vm import Event, VM
@@ -39,17 +39,17 @@ class DartDevtoolsCLI(App):
         self.styles.layers = ("below", "above") # type: ignore      
 
         self.meow = sys.argv[1].replace("http","ws")+"ws"
-        print("Connecting to "+self.meow)
         self._ws = None
         self._isolate = ""
-
 
     def compose(self) -> ComposeResult:
         if self._vm == {}:
             yield Static("")
-            self.notify("Connecting to Dart VM")
+            self.notify("Connecting to "+self.meow)
             return
-        yield Button("Reload",id="r")
+        with Horizontal():
+            yield Button("Reload",id="r")
+            yield Button("Restart",id="R")
         with VerticalScroll():
             with TabbedContent("Home","Inspector","Timeline","Memory","Performance","Debugger","Network","Logging"):
                 yield Home(self._ws, self._vm) # type: ignore
@@ -76,7 +76,13 @@ class DartDevtoolsCLI(App):
         # Listen to event
         for i in ["Debug"]:#["Debug", "Service"]:
             await ws.send_json("streamListen",{"streamId": i})
-
+    async def on_button_pressed(self, e: Button.Pressed):
+        if e.button.id == "r":
+            await self._ws.send_json("s0.reloadSources",{"isolateId": self._isolate})
+            self.notify("Hot reload completed")
+        if e.button.id == "R":
+            await self._ws.send_json("s0.hotRestart",{"isolateId": self._isolate})
+            self.notify("Hot restart completed")
 
 if __name__ == "__main__":
     asyncio.run(DartDevtoolsCLI().run_async())
