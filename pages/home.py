@@ -5,7 +5,7 @@ from textual.widget import Widget
 from textual.containers import Container
 from textual.widgets import Label, Static
 
-from e import Devtools, JsonRpc
+from e import JsonRpc
 
 if TYPE_CHECKING:
     from vm import VM
@@ -14,7 +14,7 @@ else:
 
 
 class Home(Widget):
-    def __init__(self, ws: Devtools, info: VM) -> None:
+    def __init__(self, ws: JsonRpc, info: VM) -> None:
         super().__init__(name="DevtoolsHome")
         self.styles.height = "auto"
         self._ws = ws
@@ -23,7 +23,7 @@ class Home(Widget):
         self.info2 = {}
 
         async def m():
-            self.info2 = await self._ws.ws.send_json("s0.flutterVersion", {"isolateId": self._ws.isolate['id']})
+            self.info2 = await self._ws.send_json("s0.flutterVersion", {"isolateId": self._ws.isolate['id']})
             await self.recompose()
         self.__idk__ = asyncio.ensure_future(m(),loop=asyncio.get_event_loop())
 

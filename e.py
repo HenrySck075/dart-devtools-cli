@@ -1,10 +1,10 @@
 import asyncio
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypedDict, overload
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypedDict, Union, overload
 from warnings import warn
 from aiohttp import ClientSession
 from textual import log 
-
+L = Literal
 if TYPE_CHECKING:
     from s0 import FrameworkVersion
     from flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 
     class getObject(getIsolate):
         objectId: str
+
+    class addBreakpoint(RequiresIsolateId):
+        line: int
+        scriptId: str
     debugPaint = TypedDict("debugPaint", {"enabled":bool, "isolateId": str})
     getLayoutExplorerNode = TypedDict("getLayoutExplorerNode", {"groupName":str, "isolateId": str, "id": str, "subtreeDepth": str})
 else:
@@ -35,25 +39,42 @@ class JsonRpc:
         self.listened = []
         self.rpcid = 0
         self.session = ClientSession()
+
+        self.isolate = {}
+        self.vm = {}
+        self.rootFileUri = ""
         
     async def create(self,*args,**kwargs):
         "real"
         self._ws = await self.session.ws_connect(*args,**kwargs)
         async def h():
             async for msg in self._ws:
-                print(msg)
                 j = msg.json()
                 if "result" in j.keys():
-                    log(j["id"] in self.queued_recv)
                     await self.queued_recv.pop(j["id"], lambda n: None)(j["result"])
                 elif j.get("method","") == "streamNotify":
-                    for i in self.queued_event.get(j["params"]["streamId"]+"/"+j["params"]["event"]["kind"],[]):
+                    n = j["params"]["streamId"]+"/"+j["params"]["event"]["kind"]
+                    log("Calling event "+n)
+                    for i in self.queued_event.get(n,[]):
                         await i(j["params"]["event"])
 
         asyncio.ensure_future(h(),loop=asyncio.get_event_loop())
+        self.vm = await self.send_json("getVM")
+        self.isolate = await self.send_json("getIsolate",{"isolateId":self.vm["isolates"][0]["id"]})
+        self.rootFileUri = self.isolate["rootLib"]["uri"]
         return self
     
-    def addEventListener(self, event:str, listener: Callable[[Event],Coroutine[Any,Any,None]]):
+    def addEventListener(
+        self, 
+        event:Union[
+            L["VM/VMUpdate"],
+
+            L["Debug/PauseStart"], L["Debug/PauseExit"], L["Debug/PauseBreakpoint"], L["Debug/PauseInterrupted"], L["Debug/PauseException"], L["Debug/PausePostRequest"], L["Debug/Resume"], L["Debug/BreakpointAdded"], L["Debug/BreakpointResolved"], L["Debug/BreakpointRemoved"], L["Debug/BreakpointUpdated"], L["Debug/Inspect"], L["Debug/None"],
+
+            L["Logging/Logging"]
+        ], 
+        listener: Callable[[Event],Coroutine[Any,Any,None]]
+    ):
         if listener in self.listened: raise ValueError("This function is already listened to an event.") # could be a bad idea, but meh just leave it like this
         if event not in self.queued_event:
             self.queued_event[event] = []
@@ -62,8 +83,9 @@ class JsonRpc:
 
     if TYPE_CHECKING:
         @overload 
+        def send_json(self, method: Literal["addBreakpoint"], params: addBreakpoint):...
+        @overload 
         def send_json(self, method: Literal["getObject"], params: getObject):...
-
         @overload 
         def send_json(self, method: Literal["getVM"], params = {}) -> Coroutine[Any,Any,VM]:...
         @overload 
@@ -100,35 +122,13 @@ class JsonRpc:
             j =data 
         self.queued_recv[str(self.rpcid)] = get
         
-        log(h)
-        log(self.queued_recv)
         await self._ws.send_json(h)
         self.rpcid+=1
         while j==None:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
         return j
-        #return (await self._ws.receive_json())["result"]
+        #return (await self._ws.receive_json())["res
 
-
-class Devtools:
-    "some info about the vm that needs to be passed around the codebase"
-    def __init__(self, ws: JsonRpc) -> None:
-        self.ws = ws
-        self.isolate = {}
-        self.vm = {}
-        self.rootFileUri = ""
-
-    async def create(self):
-        self.vm = await self.getVM()
-        self.isolate = await self.getIsolate(self.vm["isolates"][0]["id"])
-        self.rootFileUri = self.isolate["rootLib"]["uri"]
-
-
-    async def getVM(self) -> VM:
-        return await self.ws.send_json("getVM")
-
-    async def getIsolate(self, isolateId: str) -> Isolate:
-        return await self.ws.send_json("getIsolate", {"isolateId": isolateId})
 
     if TYPE_CHECKING:
         @overload 
@@ -145,6 +145,6 @@ class Devtools:
             objId = obj["id"] # type: ignore
         else:
             objId = "no"
-        return await self.ws.send_json("getObject", {"isolateId": self.isolate["id"], "objectId": objId})
+        return await self.send_json("getObject", {"isolateId": self.isolate["id"], "objectId": objId})
 
 

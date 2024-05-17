@@ -8,10 +8,10 @@ from textual.geometry import SpacingDimensions
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Static, Tree
 
-from e import Devtools, JsonRpc
+from e import JsonRpc
 
 if TYPE_CHECKING:
-    from flutter import LayoutNode, Widget as FlutterWidget, ExtensionResult
+    from flutter import LayoutNode
     from vm import Event
 else:
     Event = dict
@@ -62,17 +62,17 @@ class Inspector(Widget):
     treeSummary = reactive.reactive(None)
     "this does not recompose, even when recompose=True"
 
-    def __init__(self, ws: Devtools) -> None:
+    def __init__(self, ws: JsonRpc) -> None:
         super().__init__(name="DevtoolsInspector")
         self.styles.height = "auto"
         self._ws = ws
         self._isolate = ws.isolate["id"]
         async def h(): 
-            self.treeSummary = await ws.ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": self._isolate})
+            self.treeSummary = await ws.send_json("ext.flutter.inspector.getRootWidgetSummaryTreeWithPreviews", {"groupName": "tree_1", "isolateId": self._isolate})
             await self.recompose()
         asyncio.ensure_future(h())
         time.sleep(0.5)
-        self._layoutExplorer = LayoutExplorer(self._ws.ws,self._isolate)
+        self._layoutExplorer = LayoutExplorer(self._ws,self._isolate)
         self._node = None
 
     def compose(self) -> ComposeResult:
@@ -118,14 +118,14 @@ class Inspector(Widget):
                 out = Static()
                 async def on_log(e: Event):
                     out.update(out.renderable+"\n"+e["logRecord"]["message"].get("valueAsString","")) # type: ignore
-                self._ws.ws.addEventListener('Logging/Logging',on_log)
+                self._ws.addEventListener('Logging/Logging',on_log)
                 yield out
 
     def on_checkbox_changed(self, e: Checkbox.Changed):
         if e.checkbox.id == "slowanim":
-            coro = self._ws.ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
+            coro = self._ws.send_json("ext.flutter.timeDilation", {"timeDilation":5 if e.value else 1, "isolateId": self._isolate})
         if e.checkbox.id == "debugpaint":
-            coro = self._ws.ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
+            coro = self._ws.send_json("ext.flutter.debugPaint", {"enabled":e.value, "isolateId": self._isolate})
         try: 
             asyncio.ensure_future(coro) # type: ignore # yes i know
         except NameError: pass

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from vm import Event, VM
 else:
     VM = dict
-from e import Devtools, JsonRpc
+from e import JsonRpc
 from pages.home import Home
 from pages.inspector import Inspector
 from pages.debugger import Debugger
@@ -65,17 +65,16 @@ class DartDevtoolsCLI(App):
     async def on_ready(self, e):
 
         log("ujejejebegebyeybwbywbgwg w")
-        ws = Devtools(await JsonRpc().create(self.meow))
-        await ws.create()
+        ws = await JsonRpc().create(self.meow)
         self.notify("Connected :)")
         self._ws: Devtools = ws #type: ignore
-        data:VM = await ws.getVM()
+        data:VM = await ws.send_json("getVM")
         self._isolate = data["isolates"][0]["id"]
         self._vm = data
         await self.recompose()
 
         # Listen to event
-        for i in []:#["Debug", "Service"]:
+        for i in ["Debug"]:#["Debug", "Service"]:
             await ws.send_json("streamListen",{"streamId": i})
 
 
