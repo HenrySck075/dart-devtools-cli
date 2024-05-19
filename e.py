@@ -9,7 +9,7 @@ L = Literal
 if TYPE_CHECKING:
     from s0 import FrameworkVersion
     from flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
-    from vm import VM, Isolate, Event, ScriptList, Breakpoint, Script, ScriptReference, IsolateReference, Response 
+    from vm import VM, Isolate, Event, ScriptList, Breakpoint, Script, ScriptReference, IsolateReference, Response, Stack 
     RequiresIsolateId = TypedDict("RequiresIsolateId", {"isolateId": str})
     getIsolate = RequiresIsolateId
     streamListen = TypedDict("streamListen", {"streamId": str})
@@ -53,18 +53,23 @@ class JsonRpc:
         self._ws = await self.session.ws_connect(*args,**kwargs)
         async def h():
             queued = {}
+            def a(k, v):
+                queued[k] = v
             "somehow these are still not catched"
             async for msg in self._ws:
                 j = msg.json()
                 if "result" in j.keys():
                     #if j["result"]["type"] == "Sentinel":
                     #    raise IsolateExited()
-                    await self.queued_recv.pop(j["id"], lambda n: log("No response catcher found for id "+j["id"]))(j["result"])
+                    await self.queued_recv.pop(j["id"], lambda n: a(j["id"],j))(j["result"])
                 elif j.get("method","") == "streamNotify":
                     n = j["params"]["streamId"]+"/"+j["params"]["event"]["kind"]
                     log("Calling event "+n)
                     for i in self.queued_event.get(n,[]):
                         await i(j["params"]["event"])
+                for k,v in queued:
+                    await self.queued_recv.pop(k, lambda n: log("No catcher found for id "+k))(v)
+
 
         asyncio.ensure_future(h(),loop=asyncio.get_event_loop())
         self.vm = await self.send_json("getVM")
@@ -96,6 +101,8 @@ class JsonRpc:
         async def send_json(self, method: Literal["removeBreakpoint"], params: removeBreakpoint):...
         @overload 
         def send_json(self, method: Literal["getObject"], params: getObject):...
+        @overload 
+        async def send_json(self, method: Literal["getStack"], params: RequiresIsolateId) -> Stack:...
         @overload 
         async def send_json(self, method: Literal["getVM"], params = {}) -> VM:...
         @overload 
@@ -139,7 +146,7 @@ class JsonRpc:
         await self._ws.send_json(h)
         self.rpcid+=1
         while j==None:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05) # comedy
         return j
         #return (await self._ws.receive_json())["res
 

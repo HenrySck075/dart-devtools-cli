@@ -1,26 +1,16 @@
 import asyncio
 import time
-from typing import TYPE_CHECKING, Generic, TypeVar
 from textual import reactive
 from textual.app import ComposeResult, LayoutDefinition, events
 from textual.containers import Container, Horizontal, Vertical
-from textual.geometry import SpacingDimensions
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Static, Tree
 
 from e import JsonRpc
 
-if TYPE_CHECKING:
-    from flutter import LayoutNode
-    from vm import Event
-else:
-    Event = dict
-    LayoutNode = dict
-    FlutterWidget = dict
-    idk = TypeVar("idk", contravariant=True)
-    class ExtensionResult(Generic[idk], dict):
-        pass
+from ..types.flutter import LayoutNode
 
+from ..types.vm import Event
 class LayoutExplorer(Widget):
     def __init__(self, ws: JsonRpc, isolateId: str) -> None:
         super().__init__(name="DevtoolsInspectorLayout")

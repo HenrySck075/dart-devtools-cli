@@ -1,16 +1,11 @@
 import asyncio
-from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.widget import Widget 
-from textual.containers import Container
-from textual.widgets import Label, Static
+from textual.widgets import Label
 
 from e import JsonRpc
 
-if TYPE_CHECKING:
-    from vm import VM
-else: 
-    VM = dict
+from ..types.vm import VM
 
 
 class Home(Widget):

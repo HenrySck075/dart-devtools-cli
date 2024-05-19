@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, Text
+from typing import Literal
 from rich.segment import Segment
 from rich.style import Style
 from textual.app import ComposeResult
@@ -7,14 +7,11 @@ from textual.widgets.option_list import Option
 from textual.message import Message
 from textual.strip import Strip
 from textual.widget import Widget
-from textual.widgets import Input, OptionList, TextArea
+from textual.widgets import Button, Input, OptionList, TextArea
 from textual import log
 
 from e import JsonRpc
-if TYPE_CHECKING:
-    from vm import ScriptReference, Event, Breakpoint
-else:
-    from not_typing import *
+from ..types.vm import ScriptReference, Event, Breakpoint, Frame
 
 class MarkableTextArea(TextArea):
     def __init__(self, text: str = "", *, language: str | None = None, theme: str = "css", soft_wrap: bool = True, tab_behavior: Literal["focus", "indent"] = "focus", read_only: bool = False, show_line_numbers: bool = False, max_checkpoints: int = 50, name: str | None = None, id: str | None = None, classes: str | None = None, disabled: bool = False, valid_locations: list[int] = []) -> None:
@@ -94,7 +91,7 @@ class Source(Widget):
             return
         yield Input(self.uri)
         d = MarkableTextArea(self.source,read_only=True,soft_wrap=False,valid_locations=self.breakpointableLocations,show_line_numbers=True)
-        d.markers = [i["location"].get("line",0) for i in self._ws.isolate.get("breakpoints",[])]
+        d.markers = [i["location"].get("line",1)-1 for i in self._ws.isolate.get("breakpoints",[])]
         yield d
 
     async def on_markable_text_area_unmarked(self, e: MarkableTextArea.Unmarked):
@@ -109,7 +106,9 @@ class Debugger(Widget):
         self.styles.height = "auto"
         self._ws = ws 
         self._debugListened = False
+        self._paused = False
         self.breakpoints = ws.isolate["breakpoints"]
+        self.stack: list[Frame] = []
     DEFAULT_CSS = """
 .box {
   border: solid $primary-lighten-3;
@@ -125,9 +124,15 @@ class Debugger(Widget):
             async def _on_breakpoint_removed(d: Event):
                 self.breakpoints.remove(d["breakpoint"]) # type: ignore
                 self.query_one("#bp",OptionList).remove_option(d["breakpoint"]["breakpointNumber"].__str__())
+            async def _on_breakpoint_hit(d: Event):
+                self._paused = True
+                await self.query_one("#bpctrl").recompose()
+                self.stack = (await self._ws.send_json("getStack",{"isolateId": self._ws.isolate["id"]}))["frames"]
+                
 
             self._ws.addEventListener("Debug/BreakpointAdded",_on_breakpoint_added)
             self._ws.addEventListener("Debug/BreakpointRemoved",_on_breakpoint_removed)
+            self._ws.addEventListener("Debug/PauseBreakpoint",_on_breakpoint_hit)
                 
         self._debugListened = True
 
@@ -142,10 +147,14 @@ class Debugger(Widget):
                 
                 v.styles.width = 25
                 j = [self.construct_bp_option(i) for i in self.breakpoints]
-                with Container(classes="box") as callStack:
+                with OptionList(*[i["function"]["name"]+":"+i["location"]["line"].__str__() for i in self.stack],classes="box",id="stack") as callStack:
                     callStack.border_title = "Call Stack"
-                with Container(classes="box") as variables:
+                with OptionList(*[i["name"] for i in (self.stack[0]["vars"] if len(self.stack)!=0 else [])],classes="box") as variables:
                     variables.border_title = "Variables"
                 with OptionList(*j,classes="box",id="bp") as breakpoints:
                     breakpoints.border_title = "Breakpoints"
-            yield Source(self._ws)
+            with Vertical(id="src"):
+                with Horizontal(classes="autoh",id="bpctrl"):
+                    yield Button("r",id="resume",disabled=not self._paused)
+                    yield Button("s",id="step",disabled=not self._paused)
+                yield Source(self._ws)

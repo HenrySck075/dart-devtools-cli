@@ -7,10 +7,7 @@ from textual.reactive import reactive
 from textual.widgets import Button, TabbedContent, Static
 import sys,asyncio
 
-if TYPE_CHECKING:
-    from vm import Event, VM
-else:
-    VM = dict
+from .types.vm import Event, VM
 from e import JsonRpc
 from pages.home import Home
 from pages.inspector import Inspector
@@ -32,6 +29,9 @@ class DartDevtoolsCLI(App):
     CSS = """.borderless {
     border: none;
     padding: 0 
+}
+.autoh {
+    height: auto;
 }"""
     _vm = reactive({})
     def __init__(self, driver_class: Type[Driver] | None = None, css_path: CSSPathType | None = None, watch_css: bool = False):
@@ -47,7 +47,7 @@ class DartDevtoolsCLI(App):
             yield Static("")
             self.notify("Connecting to "+self.meow)
             return
-        with Horizontal():
+        with Horizontal(id="m",classes="autoh"):
             yield Button("Reload",id="r")
             yield Button("Restart",id="R")
         with VerticalScroll():

@@ -2,7 +2,7 @@
 from __future__ import annotations
 "Dart VM Core Object Types"
 "the naming is literally java"
-from typing import Any, Literal, TypedDict, Union 
+from typing import Any, Literal, TypedDict
 
 class BoundField(TypedDict):
     decl: FieldReference
@@ -11,7 +11,7 @@ class BoundField(TypedDict):
 
 class BoundVariable(Response):
     name: str
-    value: Instance | TypeArgumentsReference | Sentinel
+    value: InstanceReference | TypeArgumentsReference | Sentinel
     declarationTokenPos: int
     scopeStartTokenPos: int
     scopeEndTokenPos: int
@@ -65,12 +65,12 @@ class Code(Object):
     name: str
     kind: CodeKind
 
-CodeKind = Union[
-    Literal["Dart"],
-    Literal["Native"],
-    Literal["Stub"],
-    Literal["Tag"],
-    Literal["Collected"]
+CodeKind = Literal[
+    "Dart",
+    "Native",
+    "Stub",
+    "Tag",
+    "Collected"
 ]
 
 class ContextReference(ObjectReference):
@@ -104,11 +104,11 @@ class Error(_ErrorRequired,total=False):
     exception: InstanceReference
     stacktrace: InstanceReference
 
-ErrorKind = Union[
-    Literal["UnhandledException"],
-    Literal["LanguageError"],
-    Literal["InternalError"],
-    Literal["TerminationError"]
+ErrorKind = Literal[
+    "UnhandledException",
+    "LanguageError",
+    "InternalError",
+    "TerminationError"
 ]
 
 class _EventRequired(Response):
@@ -143,38 +143,38 @@ class Event(_EventRequired,total=False):
     previousTag: str
     cpuSamples: CpuSamplesEvent
 
-EventKind = Union[
-    Literal["VMUpdate"],
-    Literal["VMFlagUpdate"],
-    Literal["IsolateStart"],
-    Literal["IsolateRunnable"],
-    Literal["IsolateExit"],
-    Literal["IsolateUpdate"],
-    Literal["IsolateReload"],
-    Literal["ServiceExtensionAdded"],
-    Literal["PauseStart"],
-    Literal["PauseExit"],
-    Literal["PauseBreakpoint"],
-    Literal["PauseInterrupted"],
-    Literal["PauseException"],
-    Literal["PausePostRequest"],
-    Literal["Resume"],
-    Literal["None"],
-    Literal["BreakpointAdded"],
-    Literal["BreakpointResolved"],
-    Literal["BreakpointRemoved"],
-    Literal["BreakpointUpdated"],
-    Literal["GC"],
-    Literal["WriteEvent"],
-    Literal["Inspect"],
-    Literal["Extension"],
-    Literal["Logging"],
-    Literal["TimelineEvents"],
-    Literal["TimelineStreamSubscriptionsUpdate"],
-    Literal["ServiceRegistered"],
-    Literal["ServiceUnregistered"],
-    Literal["UserTagChanged"],
-    Literal["CpuSamples"]
+EventKind = Literal[
+    "VMUpdate",
+    "VMFlagUpdate",
+    "IsolateStart",
+    "IsolateRunnable",
+    "IsolateExit",
+    "IsolateUpdate",
+    "IsolateReload",
+    "ServiceExtensionAdded",
+    "PauseStart",
+    "PauseExit",
+    "PauseBreakpoint",
+    "PauseInterrupted",
+    "PauseException",
+    "PausePostRequest",
+    "Resume",
+    "None",
+    "BreakpointAdded",
+    "BreakpointResolved",
+    "BreakpointRemoved",
+    "BreakpointUpdated",
+    "GC",
+    "WriteEvent",
+    "Inspect",
+    "Extension",
+    "Logging",
+    "TimelineEvents",
+    "TimelineStreamSubscriptionsUpdate",
+    "ServiceRegistered",
+    "ServiceUnregistered",
+    "UserTagChanged",
+    "CpuSamples"
 ]
 
 ExtensionData = dict[str, Any]
@@ -203,10 +203,10 @@ class Frame(_FrameRequired,total=False):
     vars: list[BoundVariable]
     kind: FrameKind
 
-FrameKind = Union[
-    Literal["Regular"],
-    Literal["AsyncCausal"],
-    Literal["AsyncSuspensionMarker"]
+FrameKind = Literal[
+    "Regular",
+    "AsyncCausal",
+    "AsyncSuspensionMarker"
 ]
 
 class _FunctionReferenceRequired(ObjectReference):
@@ -265,34 +265,34 @@ class Instance(InstanceReference,total=False):
     token: InstanceReference
     detach: InstanceReference
 
-InstanceKind = Union[
-    Literal["PlainInstance"],
-    Literal["Null"],
-    Literal["Bool"],
-    Literal["Double"],
-    Literal["Int"],
-    Literal["String"],
-    Literal["List"],
-    Literal["Map"],
-    Literal["Set"],
-    Literal["Record"],
-    Literal["StackTrace"],
-    Literal["Closure"],
-    Literal["MirrorReference"],
-    Literal["RegExp"],
-    Literal["WeakProperty"],
-    Literal["WeakReference"],
-    Literal["Type"],
-    Literal["TypeParameter"],
-    Literal["TypeRef"],
-    Literal["FunctionType"],
-    Literal["RecordType"],
-    Literal["BoundedType"],
-    Literal["ReceivePort"],
-    Literal["UserTag"],
-    Literal["Finalizer"],
-    Literal["NativeFinalizer"],
-    Literal["FinalizerEntry"]
+InstanceKind = Literal[
+    "PlainInstance",
+    "Null",
+    "Bool",
+    "Double",
+    "Int",
+    "String",
+    "List",
+    "Map",
+    "Set",
+    "Record",
+    "StackTrace",
+    "Closure",
+    "MirrorReference",
+    "RegExp",
+    "WeakProperty",
+    "WeakReference",
+    "Type",
+    "TypeParameter",
+    "TypeRef",
+    "FunctionType",
+    "RecordType",
+    "BoundedType",
+    "ReceivePort",
+    "UserTag",
+    "Finalizer",
+    "NativeFinalizer",
+    "FinalizerEntry"
 ]
 
 class IsolateReference(Response):
@@ -346,6 +346,16 @@ class LogRecord(Response):
 class MapAssociation(TypedDict):
     key: InstanceReference | Sentinel
     value: InstanceReference | Sentinel
+
+class _MessageRequired(Response):
+    index: int
+    name: str
+    messageObjectId: str
+    size: int
+class Message(_MessageRequired,total=False):
+    handler: FunctionReference
+    location: SourceLocation
+
 class _ObjectReferenceRequired(Response):
     id: str 
 class ObjectReference(_ObjectReferenceRequired,total=False):
@@ -383,13 +393,13 @@ class Sentinel(Response):
     kind: SentinelKind
     valueAsString: str
 
-SentinelKind = Union[
-    Literal["Collected"],
-    Literal["Expired"],
-    Literal["NotInitialized"],
-    Literal["BeingInitialized"],
-    Literal["OptimizedOut"],
-    Literal["Free"]
+SentinelKind = Literal[
+    "Collected",
+    "Expired",
+    "NotInitialized",
+    "BeingInitialized",
+    "OptimizedOut",
+    "Free"
 ]
 
 class _SourceLocationRequired(TypedDict):
@@ -400,6 +410,14 @@ class SourceLocation(_SourceLocationRequired, total=False):
     column: int 
     endTokenPos: int
 
+class _StackRequired(Response):
+    frames: list[Frame]
+    messages: list[Message]
+    truncated: bool
+class Stack(_StackRequired,total=False):
+    asyncCausalFrames: list[Frame]
+    awaiterFrames: list[Frame]
+    
 class TimelineEvent(TypedDict):
     ...
 

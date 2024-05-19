@@ -1,9 +1,6 @@
 from typing import Generic, Literal, TypeVar, TypedDict
 
-"""
-
-"""
-class idk(TypedDict):
+class Location(TypedDict):
     file: str 
     line: int
     column: int
@@ -16,24 +13,28 @@ class Node(TypedDict):
     allowWrap: bool
     valueId: str
     locationId: int
-    creationLocation: idk
+    creationLocation: Location
     createdByLocalProject: bool
     summaryTree: bool
     style: str
+
 class Widget(Node):
     textPreview: str 
     children: list[Widget]
     widgetRuntimeType: bool
     stateful: bool
+
 class ExtensionResponse(TypedDict):
     method: str
     type: Literal["_extensionType"]
+
 R = TypeVar("R", contravariant=True)
 class ExtensionResult(Generic[R],ExtensionResponse):
     result: R
 
 class TimeDilationResponse(ExtensionResponse):
     timeDilation: str
+
 class DebugPaintResponse(ExtensionResponse):
     enabled: bool
 
@@ -44,12 +45,14 @@ class _RenderObjectPropertyRequired(Node):
     missingIfNull: bool
     propertyType: str
     defaultLevel: str
+
 class RenderObjectProperty(_RenderObjectPropertyRequired, total=False):
     tooltip: str
     isDiagnosticableValue: bool
 
 class RenderObject(Node):
     properties: list[RenderObjectProperty]
+
 class BoxConstraints(TypedDict):
     type: str
     description: str
@@ -57,9 +60,11 @@ class BoxConstraints(TypedDict):
     minHeigh: str
     maxWidth: str
     maxHeight: str
+
 class BoxSize(TypedDict):
     width: str 
     height: str
+
 class LayoutNode(Widget):
     renderObject: RenderObject
     parentRenderElement: LayoutNode
