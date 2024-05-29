@@ -11,3 +11,5 @@ else:
     class ExtensionResult(Generic[R],dict):
         pass 
     Location = dict
+    TimeDilationResponse = dict
+    DebugPaintResponse = dict 

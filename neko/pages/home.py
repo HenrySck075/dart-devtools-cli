@@ -4,8 +4,8 @@ from textual.widget import Widget
 from textual.widgets import Label
 
 from e import JsonRpc
-
-from ..types.vm import VM
+print(__name__)
+from ..ddstypes.vm import VM
 
 
 class Home(Widget):

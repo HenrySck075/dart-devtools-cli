@@ -7,11 +7,11 @@ from textual.reactive import reactive
 from textual.widgets import Button, TabbedContent, Static
 import sys,asyncio
 
-from .types.vm import Event, VM
+from neko.ddstypes.vm import Event, VM
 from e import JsonRpc
-from pages.home import Home
-from pages.inspector import Inspector
-from pages.debugger import Debugger
+from neko.pages.home import Home
+from neko.pages.inspector import Inspector
+from neko.pages.debugger import Debugger
 #enableTrace(True)
 
 CSSPathType = Union[

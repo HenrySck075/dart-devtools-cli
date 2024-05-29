@@ -3,7 +3,7 @@ from textual.widget import Widget
 from textual.widgets import DataTable
 
 from e import JsonRpc
-from ..types.vm import Event
+from ..ddstypes.vm import Event
 
 
 class Logging(Widget):

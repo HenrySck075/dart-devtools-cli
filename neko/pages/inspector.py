@@ -8,9 +8,9 @@ from textual.widgets import Button, Checkbox, Static, Tree
 
 from e import JsonRpc
 
-from ..types.flutter import LayoutNode
+from ..ddstypes.flutter import LayoutNode
 
-from ..types.vm import Event
+from ..ddstypes.vm import Event
 class LayoutExplorer(Widget):
     def __init__(self, ws: JsonRpc, isolateId: str) -> None:
         super().__init__(name="DevtoolsInspectorLayout")

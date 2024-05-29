@@ -1,8 +1,9 @@
 
 from __future__ import annotations
+from typing_extensions import Generic
 "Dart VM Core Object Types"
 "the naming is literally java"
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypeVar, TypedDict
 
 class BoundField(TypedDict):
     decl: FieldReference
@@ -417,9 +418,19 @@ class _StackRequired(Response):
 class Stack(_StackRequired,total=False):
     asyncCausalFrames: list[Frame]
     awaiterFrames: list[Frame]
-    
+
+#tleArgs = TypeVar("tleArgs", contravariant=True)
 class TimelineEvent(TypedDict):
-    ...
+    name: str 
+    "nam"
+    cat: str 
+    "category, meow"
+    ph: str 
+    "wtf"
+    ts: int 
+    pid: int 
+    tid: int 
+    args: dict
 
 class TypeArgumentsReference(ObjectReference):
     name: str

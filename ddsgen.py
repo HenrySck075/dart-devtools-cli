@@ -21,8 +21,7 @@ def ref(name):
     return name
 classname = ref(h.group(1)) # type: ignore
 try: superclass = ref(h.group(2)) # type: ignore
-except IndexError: superclass = "TypedDict"
-except: superclass = ""
+except: superclass = "TypedDict"
 
 out = ""
 

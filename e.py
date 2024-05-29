@@ -1,15 +1,16 @@
 import asyncio
-from threading import Thread
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypedDict, Union, overload
 from warnings import warn
 from aiohttp import ClientSession
 from textual import log
 
+
+from neko.ddstypes.s0 import FrameworkVersion
+from neko.ddstypes.flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
+from neko.ddstypes.vm import VM, Isolate, Event, ScriptList, Breakpoint, Script, ScriptReference, IsolateReference, Response, Stack, TimelineEvent
+from neko.ddstypes.services import HttpProfile  
 L = Literal
 if TYPE_CHECKING:
-    from s0 import FrameworkVersion
-    from flutter import Widget, LayoutNode, TimeDilationResponse, ExtensionResult, DebugPaintResponse
-    from vm import VM, Isolate, Event, ScriptList, Breakpoint, Script, ScriptReference, IsolateReference, Response, Stack 
     RequiresIsolateId = TypedDict("RequiresIsolateId", {"isolateId": str})
     getIsolate = RequiresIsolateId
     streamListen = TypedDict("streamListen", {"streamId": str})
@@ -27,19 +28,18 @@ if TYPE_CHECKING:
         scriptId: str
     class removeBreakpoint(RequiresIsolateId):
         breakpointId: str
+    class getHttpProfile(RequiresIsolateId, total=True):
+        updatedSince: int
     debugPaint = TypedDict("debugPaint", {"enabled":bool, "isolateId": str})
     getLayoutExplorerNode = TypedDict("getLayoutExplorerNode", {"groupName":str, "isolateId": str, "id": str, "subtreeDepth": str})
-else:
-    Event = dict
-    VM = dict
-    Isolate = dict
-    Response = dict
+
 class IsolateExited(Exception):
     pass
 class JsonRpc:
     def __init__(self) -> None:
         self.queued_recv = {}
-        self.queued_event: dict[str,list[Callable[[Event],Coroutine[Any,Any,None]]]] = {}
+        self.event_listeners: dict[str,list[Callable[[Event],Coroutine[Any,Any,None]]]] = {}
+        self.timeline_listeners: dict[str,list[Callable[[TimelineEvent],Coroutine[Any,Any,None]]]] = {}
         self.listened = []
         self.rpcid = 0
         self.session = ClientSession()
@@ -65,8 +65,14 @@ class JsonRpc:
                 elif j.get("method","") == "streamNotify":
                     n = j["params"]["streamId"]+"/"+j["params"]["event"]["kind"]
                     log("Calling event "+n)
-                    for i in self.queued_event.get(n,[]):
-                        await i(j["params"]["event"])
+                    if n != "Timeline/TimelineEvents":
+                        for i in self.event_listeners.get(n,[]):
+                            await i(j["params"]["event"])
+                    else:
+                        for e in j["params"]["event"]["timelineEvents"]:
+                            for i in self.timeline_listeners.get(e["name"],[]):
+                                await i(e)
+
                 for k,v in queued:
                     await self.queued_recv.pop(k, lambda n: log("No catcher found for id "+k))(v)
 
@@ -74,8 +80,16 @@ class JsonRpc:
         asyncio.ensure_future(h(),loop=asyncio.get_event_loop())
         self.vm = await self.send_json("getVM")
         self.isolate = await self.send_json("getIsolate",{"isolateId":self.vm["isolates"][0]["id"]})
-        self.rootFileUri = self.isolate["rootLib"]["uri"]
+        self.rootFileUri = self.isolate["rootLib"]["uri"] # type: ignore
         return self
+
+    def addTimelineEventListener(self, eventName: str,listener: Callable[[TimelineEvent],Coroutine[Any,Any,None]] ):
+        "j"
+        #if listener in self.listened: raise ValueError("This function is already listened to an event.") # could be a bad idea, but meh just leave it like this
+        if eventName not in self.timeline_listeners:
+            self.timeline_listeners[eventName] = []
+        self.timeline_listeners[eventName].append(listener)
+        #self.listened.append(listener)
     
     def addEventListener(
         self, 
@@ -84,14 +98,16 @@ class JsonRpc:
 
             "Debug/PauseStart", "Debug/PauseExit", "Debug/PauseBreakpoint", "Debug/PauseInterrupted", "Debug/PauseException", "Debug/PausePostRequest", "Debug/Resume", "Debug/BreakpointAdded", "Debug/BreakpointResolved", "Debug/BreakpointRemoved", "Debug/BreakpointUpdated", "Debug/Inspect", "Debug/None",
 
-            "Logging/Logging"
+            "Logging/Logging",
+
+            "Timeline/TimelineEvents"
         ], 
         listener: Callable[[Event],Coroutine[Any,Any,None]]
     ):
         if listener in self.listened: raise ValueError("This function is already listened to an event.") # could be a bad idea, but meh just leave it like this
-        if event not in self.queued_event:
-            self.queued_event[event] = []
-        self.queued_event[event].append(listener)
+        if event not in self.event_listeners:
+            self.event_listeners[event] = []
+        self.event_listeners[event].append(listener)
         self.listened.append(listener)
 
     if TYPE_CHECKING:
@@ -120,6 +136,9 @@ class JsonRpc:
         async def send_json(self, method: Literal["ext.flutter.timeDilation"], params: timeDilation) -> TimeDilationResponse:...
         @overload
         async def send_json(self, method: Literal["ext.flutter.debugPaint"], params: debugPaint) -> DebugPaintResponse:...
+
+        @overload
+        async def send_json(self, method: Literal["ext.dart.io.getHttpProfile"], params: getHttpProfile) -> HttpProfile:...
 
         @overload
         async def send_json(self, method: Literal["s0.flutterVersion"], params: RequiresIsolateId) -> FrameworkVersion:...

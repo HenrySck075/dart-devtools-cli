@@ -11,7 +11,7 @@ from textual.widgets import Button, Input, OptionList, TextArea
 from textual import log
 
 from e import JsonRpc
-from ..types.vm import ScriptReference, Event, Breakpoint, Frame
+from ..ddstypes.vm import ScriptReference, Event, Breakpoint, Frame
 
 class MarkableTextArea(TextArea):
     def __init__(self, text: str = "", *, language: str | None = None, theme: str = "css", soft_wrap: bool = True, tab_behavior: Literal["focus", "indent"] = "focus", read_only: bool = False, show_line_numbers: bool = False, max_checkpoints: int = 50, name: str | None = None, id: str | None = None, classes: str | None = None, disabled: bool = False, valid_locations: list[int] = []) -> None:
